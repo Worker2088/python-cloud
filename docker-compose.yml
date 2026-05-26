@@ -1,0 +1,130 @@
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: cloud_redis
+    restart: always
+# редис обычно без пробросов порта используют
+#    ports:
+#      - "6379:6379"
+
+    networks:
+      - cloud_network
+
+  # Слой Model: База данных
+  db:
+    image: postgres:15-alpine
+    ports:
+      - "5433:5432" # Позволяет DBeaver/pgAdmin видеть БД на localhost:5433
+    container_name: cloud_postgres
+    restart: always
+
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+
+    volumes:
+      - db_data:/var/lib/postgresql/data
+
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER}" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+    env_file:
+      - .env
+
+    networks:
+      - cloud_network
+
+#  INIT-КОНТЕЙНЕР для миграций
+  migration_init:
+#    image: python-cloud2-fastapi # используем тот же образ, что и бэкэнд
+    build: # Использует тот же Dockerfile, что и бэкенд (там ведь есть uv и alembic)
+      context: .
+      dockerfile: Dockerfile.fastapi
+    container_name: cloud_migration_init
+    command: uv run alembic upgrade head  # Команда, которая выполнится при старте
+    depends_on:
+      db:
+        condition: service_healthy  # Ждем, пока база данных станет полностью готова к подключениям
+    env_file:
+      - .env
+    networks:
+      - cloud_network
+
+  # Слой Controller/Service: Наш Python бэкенд
+  fastapi:
+    build:
+      context: .
+      dockerfile: Dockerfile.fastapi
+    container_name: cloud_fastapi
+    restart: always
+
+    healthcheck:
+#      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+#      test:
+#        [
+#          "CMD",
+#          "python",
+#          "-c",
+#          "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"
+#        ]
+      test: [ "CMD", "python", "--version" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+      migration_init:
+        condition: service_completed_successfully  # ЖДЕМ, ПОКА КОНТЕЙНЕР МИГРАЦИЙ ЗАКОНЧИТ РАБОТУ (код 0)
+
+      redis:
+        condition: service_started
+
+# связываем контейнер с папкой с проектом,
+# чтобы при измение кода Fastapi автоматом их видел и применял на "лету"
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+#    environment:
+#      - settings.db_url
+#      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_NAME}
+#      - DATABASE_URL=postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_NAME}
+
+    command: >
+      uvicorn src.main:app
+      --host 0.0.0.0
+      --port 8000
+      --reload
+
+    networks:
+      - cloud_network
+
+
+#  frontend:
+#    build:
+#      context: ./frontend
+#    container_name: cloud_frontend
+#    ports:
+#      - "80:80"
+#
+#    depends_on:
+#      fastapi:
+#        condition: service_healthy
+#
+#    networks:
+#      - cloud_network
+
+volumes:
+  db_data:
+
+networks:
+  cloud_network:
+    driver: bridge

@@ -1,0 +1,6 @@
+
+git init
+touch .gitignore
+brew install uv
+uv add 'fastapi[standard]' 'alembic' 'asyncpg' 'sqlalchemy' 'greenlet'
+uv add mypy ruff --dev

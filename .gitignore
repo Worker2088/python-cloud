@@ -1,0 +1,39 @@
+# Python-generated files
+**/__pycache__/
+*.py[cod]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Локальные настройки
+.idea/
+.vscode/
+
+# Личные заметки и исследования
+.gemini.md
+
+# Локальные переменные окружения
+.env
+
+# Бэкап БД
+
+# Кэш инструментов
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
+
+# Логи
+*.log
+
+# Системные файлы (Мусор от операционной системы)
+.DS_Store
+Thumbs.db
+
+# Специфично для uv (кэш установки, если он вдруг создастся локально)
+.uv/
