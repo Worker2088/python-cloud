@@ -12,7 +12,7 @@ class User(Base):
     """
     __tablename__ = "users"
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    username: Mapped[str | None] = mapped_column(
+    username: Mapped[str] = mapped_column(
         String(length=50), unique=True,
         nullable=False,
         index=True

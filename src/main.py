@@ -3,7 +3,7 @@ import logging
 from pathlib import Path
 
 from fastapi import FastAPI
-from src.auth.router import router
+from src.auth.router import router as user_router
 
 
 logger = logging.getLogger(__name__)
@@ -31,4 +31,5 @@ if config:
 app = FastAPI()
 logger.debug("создал app %s", app)
 
-app.include_router(router)
+# подключи группу роутов router к приложению app
+app.include_router(user_router)

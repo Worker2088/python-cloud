@@ -1,16 +1,19 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
+
+from src.auth.models import User
 
 
-class MyClassDTO(BaseModel):
-    param1: int  # = Field(ge=0, le=100)
-    param2: int  # = Field(ge=0, le=100)
+class UserRegistrationDTO(BaseModel):
+
+    username: str = Field(min_length=3, max_length=100)
+    password: str = Field(min_length=8, max_length=100)
 
     model_config = {"extra": "allow"}
 
 
-class BaseUserDTO(BaseModel):
-    username: str | None = Field(default=None, max_length=50)
+class UserRegistrationDTOResponse(BaseModel):
+    username: str
 
-class UserRegistrationDTO(BaseUserDTO):
-    password: str = Field(min_length=8, max_length=100)
+    # Включаем поддержку ORM-моделей
+    model_config = ConfigDict(from_attributes=True, extra="allow")
 

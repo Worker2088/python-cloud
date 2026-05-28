@@ -30,8 +30,3 @@ async def get_session() -> AsyncGenerator[AsyncSession, None]:
         yield session # превращает функцию в генератор, Она "замораживается" и сессия закроется позже
 
 
-# alias для DI или "алиас зависимости"
-DBSessionDepends = Annotated[
-    AsyncSession,
-    Depends(get_session)
-]
