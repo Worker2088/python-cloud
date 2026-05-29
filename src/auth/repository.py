@@ -1,6 +1,5 @@
 import logging
 
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.auth.models import User
@@ -25,3 +24,20 @@ class UserRepository():
 
         return user
 
+    async def get_user_id(self, user_id: int ) -> User | None:
+        logger.debug("user_id, %s", user_id)
+
+        user = await self.session.get(User, user_id)
+
+        # удаление
+        # await self.session.delete(user)
+        # await self.session.commit()
+        # апдейт
+        # user = await self.session.get(User, user_id)
+        # user.username = new_username
+        # await self.session.commit()
+        # await self.session.refresh(user)
+
+        logger.debug("user, %s", user)
+
+        return user

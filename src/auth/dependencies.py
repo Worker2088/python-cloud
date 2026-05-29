@@ -1,25 +1,124 @@
-from typing import Annotated
+import logging
+from typing import AsyncIterable
 
-from fastapi import Depends
-from sqlalchemy.ext.asyncio import AsyncSession
+from dishka import Provider, Scope, provide
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker, AsyncEngine
 
 from src.auth.interfaces import IUserRepository
 from src.auth.repository import UserRepository
 from src.auth.service import UserService
-from src.db.database import get_session
+from src.core.settings import Settings
+# from src.db.database import engine
 
+logger = logging.getLogger(__name__)
+
+class AdaptersProvider(Provider):
+    # # 1. Сессия БД создается на каждый HTTP-запрос (Scope.REQUEST)
+    # # Используем yield, чтобы после ответа клиенту Dishka сама закрыла сессию
+    # @provide(scope=Scope.REQUEST)
+    # async def provide_session(self) -> AsyncIterable[AsyncSession]:
+    #     async with AsyncSession(engine) as session:
+    #         yield session
+
+    # создаем движок БД
+    @provide(scope=Scope.APP)
+    def provide_engine(self, settings: Settings) -> AsyncEngine:
+        engine = create_async_engine(
+            url=settings.db_url,  # используем урл из настроек
+            echo=True,
+            pool_pre_ping=True
+        )
+        logger.debug("инициализировал движок БД, %s", engine.url.render_as_string(hide_password=True))
+        return engine
+
+    # фабрика сессий (async_sessionmaker)
+    # Ей нужен engine, и Дишка сама заберет его из метода выше
+    @provide(scope=Scope.APP)
+    def provide_sessionmaker(self, engine: AsyncEngine) -> async_sessionmaker[AsyncSession]:
+        async_session = async_sessionmaker(
+            bind=engine,
+            expire_on_commit=False
+        )
+        logger.debug("создал фабрику сессий и подключил ее к движку БД, %s", async_session)
+        return async_session
+
+    # === ПЕРЕЕХАЛА ФУНКЦИЯ GET_SESSION ===
+    # Вместо get_session теперь работает этот провайдер с Scope.REQUEST
+    @provide(scope=Scope.REQUEST)
+    async def provide_session(self, session_maker: async_sessionmaker[AsyncSession]) -> AsyncIterable[AsyncSession]:
+        logger.debug("запускаю сессию")
+
+        # Вместо глобального async_session() вызываем session_maker(), который прилетел аргументом
+        async with session_maker() as session:
+            logger.debug("запустил сессию %s", session)
+            yield session
+            # Дишка "заморозит" генератор, отдаст сессию в репозиторий,
+            # а после закрытия HTTP-запроса вернется сюда и закроет контекст-менеджер.
+            logger.debug("закрыл сессию %s", session)
+
+    # 2. Создаем репозиторий. Dishka увидит, что ему нужен session, и возьмет его выше.
+    # Важно: указываем тип -> IUserRepository (наш Protocol), чтобы Dishka знала,
+    # что этот класс закрывает потребность в интерфейсе.
+    @provide(scope=Scope.REQUEST)
+    def provide_user_repo(self, session: AsyncSession) -> IUserRepository:
+        return UserRepository(session=session)
+
+    # 3. Создаем сервис. Dishka видит в аргументах IUserRepository
+    # и автоматически подставит туда UserRepository.
+    @provide(scope=Scope.REQUEST)
+    def provide_user_service(self, repo: IUserRepository) -> UserService:
+        return UserService(repo=repo)
+
+
+
+class Redis:
+    pass
+
+class InfrastructureProvider(Provider):
+    # Пул коннектов к Redis живет все время работы приложения
+    @provide(scope=Scope.APP)
+    def provide_redis(self) -> Redis:
+        return Redis(host="redis", port=6379)
+
+
+class IFileStorage:
+    pass
+class S3Storage:
+    pass
+
+class IntegrationsProvider(Provider):
+    @provide(scope=Scope.REQUEST)
+    def provide_s3_storage(self) -> IFileStorage:
+        return S3Storage(bucket_name="user-avatars")
+
+
+class JwtProcessor:
+    pass
+
+class UtilsProvider(Provider):
+    # Настройки приложения
+    # @provide(scope=Scope.APP)
+    # def provide_settings(self) -> Settings:
+    #     return Settings()
+
+    # Компонент для работы с JWT (берет секрет из настроек)
+    @provide(scope=Scope.APP)
+    def provide_jwt_processor(self, settings: Settings) -> JwtProcessor:
+        return JwtProcessor(secret_key=settings.JWT_SECRET)
 
 # alias для DI или "алиас зависимости"
-DBSessionDepends = Annotated[AsyncSession, Depends(get_session)]
+# DBSessionDepends = Annotated[AsyncSession, Depends(get_session)]
+#
+# # собираем матрешку для нашего роутера auth
+# # Зависимость для создания репозитория
+# def get_user_repository(session: DBSessionDepends) -> IUserRepository:
+#     return UserRepository(session)
+#
+# # Зависимость для создания сервиса, которая сама затребует репозиторий
+# def get_user_service(repo: IUserRepository = Depends(get_user_repository)) -> UserService:
+#     return UserService(repo)
+#
+# # Удобный алиас для аннотации в роутере
+# UserServiceDepends = Annotated[UserService, Depends(get_user_service)]
 
-# собираем матрешку для нашего роутера auth
-# Зависимость для создания репозитория
-def get_user_repository(session: DBSessionDepends) -> IUserRepository:
-    return UserRepository(session)
 
-# Зависимость для создания сервиса, которая сама затребует репозиторий
-def get_user_service(repo: IUserRepository = Depends(get_user_repository)) -> UserService:
-    return UserService(repo)
-
-# Удобный алиас для аннотации в роутере
-UserServiceDepends = Annotated[UserService, Depends(get_user_service)]

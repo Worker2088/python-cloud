@@ -1,5 +1,8 @@
 import logging
 
+from fastapi import HTTPException
+
+from src.auth.exception import UserNotFoundError
 from src.auth.interfaces import IUserRepository
 from src.auth.schemas import UserRegistrationDTOResponse, UserRegistrationDTO
 
@@ -22,3 +25,15 @@ class UserService:
 
         return UserRegistrationDTOResponse.model_validate(user_model)
 
+    async def get_user(self, user_id: int) -> UserRegistrationDTOResponse:
+        user = await self.repo.get_user_id(user_id=user_id)
+
+        if user is None:
+            logger.debug("!!!юзера НЕ нашли, %s", user)
+            raise HTTPException(
+                status_code=404,
+                detail="User not found"
+            )
+
+        logger.debug("!!!юзера нашли, %s", user)
+        return UserRegistrationDTOResponse.model_validate(user)

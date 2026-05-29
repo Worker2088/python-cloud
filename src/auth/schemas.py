@@ -1,7 +1,5 @@
 from pydantic import BaseModel, Field, ConfigDict
 
-from src.auth.models import User
-
 
 class UserRegistrationDTO(BaseModel):
 
