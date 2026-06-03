@@ -1,6 +1,6 @@
 
 
-from sqlalchemy import String
+from sqlalchemy import String, Boolean
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.db.base import Base
@@ -21,4 +21,9 @@ class User(Base):
         String(length=1024),
         nullable=False
     )
+    is_active: Mapped[bool] = mapped_column(Boolean, default= True, index=True)
 
+    # def __init__(self, username: str, hashed_password: str, is_active: bool):
+    #     self.username = username
+    #     self.hashed_password = hashed_password
+    #     self.is_active = is_active

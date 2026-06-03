@@ -2,10 +2,14 @@ import logging
 
 from dishka import FromDishka
 from dishka.integrations.fastapi import inject
-from fastapi import APIRouter, Path
+from fastapi import APIRouter, Path, HTTPException
 
-from src.auth.schemas import UserRegistrationDTO, UserRegistrationDTOResponse
+from src.auth.dependencies import CurrentUserDeps
+from src.auth.exception import UserAlreadyExists, UserNotLogin, UserNotFound
+from src.auth.models import User
+from src.auth.schemas import UserRegisterRequest, JWTResponse, UserLoginRequest, SessionResponse
 from src.auth.service import UserService
+# from src.auth.session.service import SessionService
 
 logger = logging.getLogger(__name__)
 
@@ -13,29 +17,118 @@ router = APIRouter(prefix="/api/auth") # создай mini-app для групп
 # router это папка/контейнер с группой endpoint'ов
 
 
-@router.post("/sign-up", response_model=UserRegistrationDTOResponse)
+# --------------------------------------------
+# реализация через сессии
+
+@router.post("/sign-up", response_model=SessionResponse)
 @inject  # <-- ОБЯЗАТЕЛЬНО: этот декоратор заставляет Dishka искать маркеры в аргументах
 async def create_user(
-        create_user_dto: UserRegistrationDTO,
+        create_user_dto: UserRegisterRequest,
         user_service: FromDishka[UserService]
-        # Говорим Дишке: "достань мне этот класс из контейнера"
         ):
-    logger.debug("!!!create_user_dto, %s", create_user_dto)
+    logger.debug("!!!начал регистрацию нового юзера, %s", create_user_dto)
 
-    user = await user_service.create_user(create_user_dto)
-    return user
+    try:
+        session_id = await user_service.create(create_user_dto)
+        return SessionResponse(session_id=session_id)
 
-@router.get("/", response_model=UserRegistrationDTOResponse)
-@inject  # <-- ОБЯЗАТЕЛЬНО: этот декоратор заставляет Dishka искать маркеры в аргументах
-async def get_user(
-        user_id: int,
+    except UserAlreadyExists:
+        raise HTTPException(
+            status_code=409,
+            detail="User already exists"
+        )
+
+
+@router.post("/sign-in", response_model=SessionResponse)
+@inject
+async def authenticate(
+        user: UserLoginRequest,
         user_service: FromDishka[UserService]
-        # Говорим Дишке: "достань мне этот класс из контейнера"
         ):
-    logger.debug("!!!user_id, %s", user_id)
+    logger.debug("!!!начал авторизацию нового юзера, %s", user)
 
-    user = await user_service.get_user(user_id)
-    return user
+    try:
+
+        session_id = await user_service.authenticate(user)
+        return SessionResponse(session_id=session_id)
+
+    except UserNotLogin:
+        raise HTTPException(
+            status_code=409,
+            detail="user is not registered"
+        )
+    except UserNotFound:
+        raise HTTPException(
+            status_code=404,
+            detail="user not found"
+        )
+
+
+@router.get("/me")
+@inject
+# async def me(current_user: FromDishka[User]):
+async def me(current_user: CurrentUserDeps):
+    return {
+        "id": current_user.id,
+        "username": current_user.username,
+    }
+
+
+# --------------------------------------------
+# реализация через JWT
+
+# @router.post("/sign-up", response_model=JWTResponse)
+# @inject  # <-- ОБЯЗАТЕЛЬНО: этот декоратор заставляет Dishka искать маркеры в аргументах
+# async def create_user(
+#         create_user_dto: UserRegisterRequest,
+#         user_service: FromDishka[UserService]
+#         ):
+#     logger.debug("!!!начал регистрацию нового юзера, %s", create_user_dto)
+#
+#     try:
+#         token = await user_service.create(create_user_dto)
+#         return JWTResponse(token=token)
+#
+#     except UserAlreadyExists:
+#         raise HTTPException(
+#             status_code=409,
+#             detail="User already exists"
+#         )
+#
+#
+# @router.post("/sign-in", response_model=JWTResponse)
+# @inject
+# async def authenticate(
+#         user: UserLoginRequest,
+#         user_service: FromDishka[UserService]
+#         ):
+#     logger.debug("!!!начал авторизацию нового юзера, %s", user)
+#
+#     try:
+#         token = await user_service.authenticate(user)
+#         return JWTResponse(token=token)
+#
+#     except UserNotLogin:
+#         raise HTTPException(
+#             status_code=409,
+#             detail="user is not registered"
+#         )
+#     except UserNotFound:
+#         raise HTTPException(
+#             status_code=404,
+#             detail="user not found"
+#         )
+#
+#
+# @router.get("/me")
+# @inject
+# # async def me(current_user: FromDishka[User]):
+# async def me(current_user: CurrentUserDeps):
+#     return {
+#         "id": current_user.id,
+#         "username": current_user.username,
+#     }
+
 
 
 

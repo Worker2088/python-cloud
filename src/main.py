@@ -6,8 +6,9 @@ from dishka import make_async_container
 from dishka.integrations.fastapi import setup_dishka
 from fastapi import FastAPI
 
-from src.auth.dependencies import AdaptersProvider, InfrastructureProvider, IntegrationsProvider, UtilsProvider
+from src.auth.providers import AdaptersProvider, InfrastructureProvider, IntegrationsProvider
 from src.auth.router import router as user_router
+from src.core.middleware.logging import LoggingMiddleware
 from src.core.settings import Settings
 
 logger = logging.getLogger(__name__)
@@ -37,6 +38,7 @@ def create_app() -> FastAPI:
     logger.debug("создал app %s", app)
     # подключил группу роутов router к приложению app
     app.include_router(user_router)
+    app.add_middleware(LoggingMiddleware)
 
     # Читаем настройки НА СТАРТЕ приложения.
     # Если в .env ошибка — код упадет прямо здесь, жестко и сразу.
@@ -47,7 +49,6 @@ def create_app() -> FastAPI:
         AdaptersProvider(),
         InfrastructureProvider(),
         IntegrationsProvider(),
-        UtilsProvider(),
         context={Settings: app_settings} # в контекст дишки отправляем настройки
     )
 

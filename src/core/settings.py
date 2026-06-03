@@ -1,9 +1,14 @@
 import logging
 
-from pydantic import computed_field
+from pydantic import computed_field, BaseModel
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 logger = logging.getLogger(__name__)
+
+
+class AuthSettings(BaseModel):
+    secret: str
+    expire_minutes: int
 
 
 class Settings(BaseSettings):
@@ -20,6 +25,10 @@ class Settings(BaseSettings):
 
     debug: bool = True
 
+    jwt_secret: str
+    jwt_expire_minutes: int # время жизни JWT токена
+
+
     @computed_field
     @property
     def db_url(self) -> str:
@@ -31,6 +40,11 @@ class Settings(BaseSettings):
             f"{self.postgres_port}/"
             f"{self.postgres_db}"
         )
+
+
+    @property
+    def auth(self) -> AuthSettings:
+        return AuthSettings(secret=self.jwt_secret, expire_minutes=self.jwt_expire_minutes)
 
 
 settings = Settings()
