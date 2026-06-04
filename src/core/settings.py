@@ -27,7 +27,7 @@ class Settings(BaseSettings):
 
     jwt_secret: str
     jwt_expire_minutes: int # время жизни JWT токена
-
+    redis_url: str = "redis://localhost:6379"
 
     @computed_field
     @property
@@ -47,6 +47,6 @@ class Settings(BaseSettings):
         return AuthSettings(secret=self.jwt_secret, expire_minutes=self.jwt_expire_minutes)
 
 
-settings = Settings()
-logger.debug("создал settings %s", settings)
+# settings = Settings()
+# logger.debug("создал settings %s", settings)
 

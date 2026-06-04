@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from alembic import context
 
-from src.core.settings import settings
+from src.core.settings import Settings
 from src.db.base import Base
 from src.auth.models import User
 
@@ -14,7 +14,7 @@ from src.auth.models import User
 # доступ к значениям внутри используемого .ini файла.
 config = context.config
 
-db_url = settings.db_url
+db_url = Settings().db_url
 
 if db_url:
     # Экранируем знаки процента %, заменяя их на %%,

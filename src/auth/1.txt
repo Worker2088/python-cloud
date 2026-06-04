@@ -24,10 +24,6 @@ class AdaptersProvider(Provider):
     # создаем движок БД
     @provide(scope=Scope.APP)
     def provide_engine(self, settings: Settings) -> AsyncEngine:
-        logger.debug(
-            "DB URL = %s",
-            settings.db_url
-        )
         engine = create_async_engine(
             url=settings.db_url,  # используем урл из настроек
             echo=True,
@@ -95,18 +91,12 @@ class AdaptersProvider(Provider):
 class InfrastructureProvider(Provider):
 
     @provide(scope=Scope.APP)
-    async def provide_redis(self, settings: Settings) -> AsyncIterable[redis.Redis]:
-        # Используем метод from_url и забираем строку подключения из настроек
-        # Для прода это будет redis://redis:6379, а для тестов в conftest подменится на redis://localhost:6380
-        logger.warning(
-            "REDIS URL = %s",
-            settings.redis_url
+    def provide_redis(self) -> redis.Redis:
+        return redis.Redis(
+            host="redis",
+            port=6379,
+            decode_responses=True
         )
-        client = redis.Redis.from_url(settings.redis_url, decode_responses=True,  )
-
-        yield client
-
-        await client.aclose()
 
     @provide(scope=Scope.APP)
     def provide_session_storage(self, redis: redis.Redis) -> ISessionStorage:

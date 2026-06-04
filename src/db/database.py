@@ -3,7 +3,7 @@ from typing import AsyncGenerator
 
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 
-from src.core.settings import settings
+# from src.core.settings import settings
 
 logger = logging.getLogger(__name__)
 

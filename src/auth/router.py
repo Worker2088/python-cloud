@@ -74,6 +74,11 @@ async def me(current_user: CurrentUserDeps):
     }
 
 
+@router.get("/health")
+async def health_check():
+    return {"status": "healthy"}
+
+
 # --------------------------------------------
 # реализация через JWT
 

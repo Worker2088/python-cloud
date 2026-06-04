@@ -1,5 +1,6 @@
 import json
 import logging
+import logging.config
 from pathlib import Path
 
 from dishka import make_async_container
@@ -33,24 +34,25 @@ if config:
     print("LOGGING: JSON CONFIG USED")
 
 
-def create_app() -> FastAPI:
+def create_app(container_dishka=None) -> FastAPI:
     app = FastAPI()
     logger.debug("создал app %s", app)
     # подключил группу роутов router к приложению app
     app.include_router(user_router)
-    app.add_middleware(LoggingMiddleware)
+    app.add_middleware(LoggingMiddleware) # сделал чтоб просто посмотреть работу с middleware
 
-    # Читаем настройки НА СТАРТЕ приложения.
-    # Если в .env ошибка — код упадет прямо здесь, жестко и сразу.
-    app_settings = Settings()
+    if container_dishka is None:
+        # Читаем настройки НА СТАРТЕ приложения.
+        # Если в .env ошибка — код упадет прямо здесь, жестко и сразу.
+        app_settings = Settings()
 
-    # 1. Создаем контейнер и передаем наши провайдеры
-    container_dishka = make_async_container(
-        AdaptersProvider(),
-        InfrastructureProvider(),
-        IntegrationsProvider(),
-        context={Settings: app_settings} # в контекст дишки отправляем настройки
-    )
+        # 1. Создаем контейнер и передаем наши провайдеры
+        container_dishka = make_async_container(
+            AdaptersProvider(),
+            InfrastructureProvider(),
+            IntegrationsProvider(),
+            context={Settings: app_settings} # в контекст дишки отправляем настройки
+        )
 
     # 2. Интегрируем Dishka в FastAPI
     setup_dishka(container_dishka, app)

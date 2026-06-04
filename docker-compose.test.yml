@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  test_db:
+    image: postgres:16-alpine
+    container_name: cloud_fastapi_test_db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: test_db
+    # Маппим внутренний порт 5432 на внешний 5434, чтобы не было конфликта с рабочей БД
+    ports:
+      - "5434:5432"
+    volumes:
+      - test_postgres_data:/var/lib/postgresql/data
+    networks:
+      - test_network
+
+  test_redis:
+    image: redis:7-alpine
+    container_name: cloud_fastapi_test_redis
+    # Маппим внутренний порт 6379 на внешний 6380
+    ports:
+      - "6380:6379"
+    networks:
+      - test_network
+
+volumes:
+  test_postgres_data:
+
+networks:
+  test_network:
