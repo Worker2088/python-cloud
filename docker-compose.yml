@@ -1,4 +1,18 @@
 services:
+  # Наш фронтенд на React + Nginx
+  frontend:
+    build:
+      context: ./frontend # Путь к папке фронта
+      dockerfile: Dockerfile
+    container_name: react_frontend
+    ports:
+      - "80:80" # Фронт будет доступен на стандартном 80 порту
+    depends_on:
+      - fastapi # Ждем запуска бэкенда
+    restart: always
+    networks:
+      - cloud_network
+
   redis:
     image: redis:7-alpine
     container_name: cloud_redis
@@ -63,15 +77,7 @@ services:
     restart: always
 
     healthcheck:
-#      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-#      test:
-#        [
-#          "CMD",
-#          "python",
-#          "-c",
-#          "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"
-#        ]
-      test: [ "CMD", "python", "--version" ]
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/healthcheck"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -106,21 +112,6 @@ services:
 
     networks:
       - cloud_network
-
-
-#  frontend:
-#    build:
-#      context: ./frontend
-#    container_name: cloud_frontend
-#    ports:
-#      - "80:80"
-#
-#    depends_on:
-#      fastapi:
-#        condition: service_healthy
-#
-#    networks:
-#      - cloud_network
 
 volumes:
   db_data:

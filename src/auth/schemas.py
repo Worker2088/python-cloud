@@ -32,7 +32,15 @@ class JWTResponse(BaseModel):
 
 # используется если авторизация через сессии
 class SessionResponse(BaseModel):
+    id: int
+    username: str
     session_id: str
+    # Включаем поддержку ORM-моделей
+    model_config = ConfigDict(from_attributes=True, extra="allow")
 
+class UserResponse(BaseModel):
+    id: int
+    username: str
+    session_id: str
     # Включаем поддержку ORM-моделей
     model_config = ConfigDict(from_attributes=True, extra="allow")

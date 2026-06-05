@@ -6,7 +6,7 @@ from src.auth.exception import UserNotFound, UserNotLogin
 from src.auth.interfaces import IUserRepository
 from src.auth.jwt import IJWT
 from src.auth.models import User
-from src.auth.schemas import UserRegisterRequest, UserLoginRequest, JWTResponse
+from src.auth.schemas import UserRegisterRequest, UserLoginRequest, JWTResponse, UserResponse
 from src.auth.security import IPasswordHasher
 from src.auth.session.storage import ISessionStorage
 
@@ -22,7 +22,7 @@ class UserService:
         self.hasher = hasher
         self.session = session
 
-    async def create(self, data: UserRegisterRequest) -> str:
+    async def create(self, data: UserRegisterRequest) -> UserResponse:
         logger.debug("!!!создаю юзера %s", data)
         hashed_password = self.hasher.hash_password(data.password)
 
@@ -32,10 +32,14 @@ class UserService:
         logger.debug("!!!saved_user, %s", saved_user.id)
 
         session_id = await self.session.create_session(saved_user.id)
-        return session_id
+
+        return UserResponse(
+            id=saved_user.id,
+            username=saved_user.username,
+            session_id=session_id)
 
 
-    async def authenticate(self, user_dto: UserLoginRequest) -> str:
+    async def authenticate(self, user_dto: UserLoginRequest) -> UserResponse:
             user = await self.repo.get_user_by_name(user_dto.username)
             logger.debug("!!!получил юзера из БД, %s", user)
 
@@ -49,8 +53,11 @@ class UserService:
             logger.debug("!!!логин пароль верные")
 
             session_id = await self.session.create_session(user.id)
-            return session_id
 
+            return UserResponse(
+                id=user.id,
+                username=user.username,
+                session_id=session_id)
 
     async def get_user_by_id(self, user_id: int) -> User:
         user = await self.repo.get_user_by_id(user_id=user_id)

@@ -6,6 +6,7 @@ from pathlib import Path
 from dishka import make_async_container
 from dishka.integrations.fastapi import setup_dishka
 from fastapi import FastAPI
+from starlette.middleware.cors import CORSMiddleware
 
 from src.auth.providers import AdaptersProvider, InfrastructureProvider, IntegrationsProvider
 from src.auth.router import router as user_router
@@ -41,6 +42,21 @@ def create_app(container_dishka=None) -> FastAPI:
     app.include_router(user_router)
     app.add_middleware(LoggingMiddleware) # сделал чтоб просто посмотреть работу с middleware
 
+    # Указываем адреса, с которых разрешены запросы к API
+    origins = [
+        "http://localhost:5173",  # Для локальной разработки React (Vite)
+        "http://localhost:80",  # Для продакшена через Nginx
+        "http://localhost",  # На случай запросов без указания порта
+    ]
+
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=origins,
+        allow_credentials=True,  # Важно для работы с куками и сессиями
+        allow_methods=["*"],  # Разрешаем все методы (GET, POST, PUT, DELETE)
+        allow_headers=["*"],  # Разрешаем все заголовки
+    )
+
     if container_dishka is None:
         # Читаем настройки НА СТАРТЕ приложения.
         # Если в .env ошибка — код упадет прямо здесь, жестко и сразу.
@@ -61,3 +77,9 @@ def create_app(container_dishka=None) -> FastAPI:
 
 
 app = create_app()
+
+
+
+@app.get("/api/v1/healthcheck")
+def healthcheck():
+    return {"status": "ok"}
