@@ -1,8 +1,6 @@
 import logging
 
-from fastapi import HTTPException
-
-from src.auth.exception import UserNotFound, UserNotLogin
+from src.auth.exception import UserNotFoundError, UserNotLoggedInError
 from src.auth.interfaces import IUserRepository
 from src.auth.jwt import IJWT
 from src.auth.models import User
@@ -45,10 +43,11 @@ class UserService:
 
             if user is None:
                 logger.debug("!!!ошибка в логине, %s", user_dto.username)
-                raise UserNotLogin()
+                raise UserNotLoggedInError()
             if not self.hasher.verify_password(user_dto.password, user.hashed_password):
+                # todo убрать лог для прода
                 logger.debug("!!!ошибка в пароле")
-                raise UserNotLogin()
+                raise UserNotLoggedInError()
 
             logger.debug("!!!логин пароль верные")
 
@@ -64,7 +63,7 @@ class UserService:
 
         if user is None:
             logger.debug("!!!юзера НЕ нашли, %s", user)
-            raise UserNotFound()
+            raise UserNotFoundError()
 
         logger.debug("!!!юзера нашли, %s", user)
         return user

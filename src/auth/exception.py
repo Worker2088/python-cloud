@@ -1,21 +1,23 @@
-from fastapi import HTTPException
+
 
 class BaseAppException(Exception):
-    pass
+    def __init__(self, message: str, status_code: int = 500):
+        self.message = message
+        self.status_code = status_code
+        super().__init__(self.message)
 
-class MyHTTPException(HTTPException):
-    def __init__(self) -> None:
-        super().__init__(404, "параметр менее 100")
+class UserAlreadyExistsError(BaseAppException):
+    def __init__(self, msg: str = "Пользователь уже существует") -> None:
+        super().__init__(msg, 409)
 
+class UserNotLoggedInError(BaseAppException):
+    def __init__(self, msg: str = "Пользователь не авторизован") -> None:
+        super().__init__(msg, 401)
 
-class UserAlreadyExists(BaseAppException):
-    pass
+class DatabaseError(BaseAppException):
+    def __init__(self, msg: str = "Ошибка базы данных") -> None:
+        super().__init__(msg, 500)
 
-class UserNotLogin(BaseAppException):
-    pass
-
-class DBError(BaseAppException):
-    pass
-
-class UserNotFound():
-    pass
+class UserNotFoundError(BaseAppException):
+    def __init__(self, msg: str = "Пользователь не найден") -> None:
+        super().__init__(msg, 404)

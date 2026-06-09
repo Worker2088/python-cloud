@@ -23,7 +23,20 @@ class User(Base):
     )
     is_active: Mapped[bool] = mapped_column(Boolean, default= True, index=True)
 
-    # def __init__(self, username: str, hashed_password: str, is_active: bool):
-    #     self.username = username
-    #     self.hashed_password = hashed_password
-    #     self.is_active = is_active
+    # access_key: Mapped[str] = mapped_column(
+    #         String(length=1024), unique=True,
+    #         nullable=False)
+    # secret_key: Mapped[str] = mapped_column(
+    #         String(length=1024), unique=True,
+    #         nullable=False)
+    # endpoint_url: Mapped[str] = mapped_column(
+    #             String(length=1024),
+    #             nullable=False)
+    # bucket_name: Mapped[str] = mapped_column(
+    #             String(length=1024),
+    #             nullable=False)
+
+    # имя
+    # размер
+    # владелец
+    # путь

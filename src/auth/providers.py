@@ -3,8 +3,6 @@ from typing import AsyncIterable
 
 import redis.asyncio as redis
 from dishka import Provider, Scope, provide
-from fastapi import Depends, HTTPException
-from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker, AsyncEngine
 
 from src.auth.interfaces import IUserRepository

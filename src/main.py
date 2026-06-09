@@ -5,11 +5,16 @@ from pathlib import Path
 
 from dishka import make_async_container
 from dishka.integrations.fastapi import setup_dishka
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from starlette.middleware.cors import CORSMiddleware
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from src.auth.exception import BaseAppException
 from src.auth.providers import AdaptersProvider, InfrastructureProvider, IntegrationsProvider
 from src.auth.router import router as user_router
+from src.storage.providers import StorageProvider
+from src.storage.router import router as storage_router
 from src.core.middleware.logging import LoggingMiddleware
 from src.core.settings import Settings
 
@@ -40,7 +45,8 @@ def create_app(container_dishka=None) -> FastAPI:
     logger.debug("создал app %s", app)
     # подключил группу роутов router к приложению app
     app.include_router(user_router)
-    app.add_middleware(LoggingMiddleware) # сделал чтоб просто посмотреть работу с middleware
+    app.include_router(storage_router)
+    # app.add_middleware(LoggingMiddleware) # сделал чтоб просто посмотреть работу с middleware
 
     # Указываем адреса, с которых разрешены запросы к API
     origins = [
@@ -65,6 +71,7 @@ def create_app(container_dishka=None) -> FastAPI:
         # 1. Создаем контейнер и передаем наши провайдеры
         container_dishka = make_async_container(
             AdaptersProvider(),
+            StorageProvider(),
             InfrastructureProvider(),
             IntegrationsProvider(),
             context={Settings: app_settings} # в контекст дишки отправляем настройки
@@ -79,7 +86,30 @@ def create_app(container_dishka=None) -> FastAPI:
 app = create_app()
 
 
-
 @app.get("/api/v1/healthcheck")
 def healthcheck():
     return {"status": "ok"}
+
+
+@app.exception_handler(BaseAppException)
+async def base_app_exception_handler(request: Request, exc: BaseAppException):
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"message": exc.message},
+    )
+
+# ловим HTTP-исключения (Starlette) и формируем ответ по ТЗ
+@app.exception_handler(StarletteHTTPException)
+async def http_exception_handler(request: Request, exc: StarletteHTTPException):
+    if exc.status_code == 404:
+        # Приводим к формату ТЗ
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={"message": "Ресурс не найден"},  # Или можно взять exc.detail, если хочешь
+        )
+
+    # # Для остальных HTTPException (400, 401, 500 и т. п.) тоже можно унифицировать
+    # return JSONResponse(
+    #     status_code=exc.status_code,
+    #     content={"message": exc.detail},
+    # )
