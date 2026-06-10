@@ -106,64 +106,64 @@ async def logout(
     return {"detail": "Успешный выход из системы"}
 
 
-@router.get("/directory", response_model=list[StorageObjectSchema])
-@inject
-async def get_directory_contents(current_user: CurrentUserDeps, path: Optional[str] = Query("")):
-    # Здесь у вас уже есть легитимный current_user!
-    # Вы можете использовать его id, чтобы отдать файлы конкретного пользователя
-    user_id = current_user.id
-    print(f"Пользователь {current_user.username} (ID: {user_id}) запрашивает папку: '{path}'")
-
-    # Пока отдаем заглушку, но теперь безопасно
-    if path == "":
-        return [
-            {
-                "path": "documents",
-                "name": "Личные документы",
-                "type": "DIRECTORY",
-                "size": None
-            },
-            {
-                "path": "photos",
-                "name": "Фотографии с отпуска",
-                "type": "DIRECTORY",
-                "size": None
-            },
-            {
-                "path": "important_note.txt",
-                "name": "важная_записка.txt",
-                "type": "FILE",
-                "size": 4096
-            },
-            {
-                "path": "avatar.png",
-                "name": "avatar.png",
-                "type": "FILE",
-                "size": 1048576
-            }
-        ]
-
-        # Если запрашивают конкретную папку (например, кликнули на "documents")
-    return [
-        {
-            "path": f"{path}/resume.pdf",
-            "name": "Резюме_Разработчика.pdf",
-            "type": "FILE",
-            "size": 245000
-        },
-        {
-            "path": f"{path}/todo.txt",
-            "name": "список_дел.txt",
-            "type": "FILE",
-            "size": 512
-        },
-        {
-            "path": f"{path}/папка",
-            "name": "просто папка",
-            "type": "DIRECTORY",
-            "size": None
-        }
-    ]
+# @router.get("/directory", response_model=list[StorageObjectSchema])
+# @inject
+# async def get_directory_contents(current_user: CurrentUserDeps, path: Optional[str] = Query("")):
+#     # Здесь у вас уже есть легитимный current_user!
+#     # Вы можете использовать его id, чтобы отдать файлы конкретного пользователя
+#     user_id = current_user.id
+#     print(f"Пользователь {current_user.username} (ID: {user_id}) запрашивает папку: '{path}'")
+#
+#     # Пока отдаем заглушку, но теперь безопасно
+#     if path == "":
+#         return [
+#             {
+#                 "path": "documents",
+#                 "name": "Личные документы",
+#                 "type": "DIRECTORY",
+#                 "size": None
+#             },
+#             {
+#                 "path": "photos",
+#                 "name": "Фотографии с отпуска",
+#                 "type": "DIRECTORY",
+#                 "size": None
+#             },
+#             {
+#                 "path": "important_note.txt",
+#                 "name": "важная_записка.txt",
+#                 "type": "FILE",
+#                 "size": 4096
+#             },
+#             {
+#                 "path": "avatar.png",
+#                 "name": "avatar.png",
+#                 "type": "FILE",
+#                 "size": 1048576
+#             }
+#         ]
+#
+#         # Если запрашивают конкретную папку (например, кликнули на "documents")
+#     return [
+#         {
+#             "path": f"{path}/resume.pdf",
+#             "name": "Резюме_Разработчика.pdf",
+#             "type": "FILE",
+#             "size": 245000
+#         },
+#         {
+#             "path": f"{path}/todo.txt",
+#             "name": "список_дел.txt",
+#             "type": "FILE",
+#             "size": 512
+#         },
+#         {
+#             "path": f"{path}/папка",
+#             "name": "просто папка",
+#             "type": "DIRECTORY",
+#             "size": None
+#         }
+#     ]
 
 
 # --------------------------------------------

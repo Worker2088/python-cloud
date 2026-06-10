@@ -6,6 +6,7 @@ from botocore.exceptions import ClientError
 
 # дополнительно установите pip install certifi, чтобы не было проблем с сертификатом
 
+
 class S3Client:
     def __init__(
             self,
@@ -63,20 +64,86 @@ class S3Client:
         except ClientError as e:
             print(f"Error downloading file: {e}")
 
+# создать пустую папку
+# async with self.get_client() as client:
+#     await client.put_object(
+#         Bucket=self.bucket_name,
+#         Key="user_59/folder1/",
+#         Body=b"",
+#     )
 
-async def main():
-    s3_client = S3Client(
-        access_key="",
-        secret_key="",
-        endpoint_url="",  # для Selectel используйте https://s3.storage.selcloud.ru
-        bucket_name="",
-    )
+# получить все объекты с индексом user_59/folder1/
+# response = await client.list_objects_v2(
+#     Bucket=self.bucket_name,
+#     Prefix="user_59/folder1/"
+# )
+# получим ответ
+# {
+#     "Contents": [
+#         {"Key": "user_59/folder1/"},
+#         {"Key": "user_59/folder1/cat.jpg"},
+#         {"Key": "user_59/folder1/dog.jpg"},
+#         {"Key": "user_59/folder1/docs/"},
+#         {"Key": "user_59/folder1/docs/report.pdf"},
+#     ]
+# }
+# удилить их
+# objects = [
+#     {"Key": item["Key"]}
+#     for item in response["Contents"]
+# ]
+# await client.delete_objects(
+#     Bucket=self.bucket_name,
+#     Delete={
+#         "Objects": objects
+#     }
+# )
 
-    # Проверка, что мы можем загрузить, скачать и удалить файл
-    await s3_client.upload_file("test.txt")
-    await s3_client.get_file("test.txt", "text_local_file.txt")
-    await s3_client.delete_file("test.txt")
 
 
-if __name__ == "__main__":
-    asyncio.run(main())
+
+# async def main():
+#     s3_client = S3Client(
+#         access_key="",
+#         secret_key="",
+#         endpoint_url="",  # для Selectel используйте https://s3.storage.selcloud.ru
+#         bucket_name="",
+#     )
+#
+#     # Проверка, что мы можем загрузить, скачать и удалить файл
+#     await s3_client.upload_file("test.txt")
+#     await s3_client.get_file("test.txt", "text_local_file.txt")
+#     await s3_client.delete_file("test.txt")
+#
+#
+# if __name__ == "__main__":
+#     asyncio.run(main())
+
+
+
+# Настройка клиента для Minio
+# s3_client = boto3.client(
+#     "s3",
+#     endpoint_url="http://127.0.0.1:9000",  # Обратите внимание: 9000 - это API, 9001 - это Console (UI)
+#     aws_access_key_id="minioadmin",       # Ваши креды из docker-compose
+#     aws_secret_access_key="minioadmin",
+#     use_ssl=False # Для локального dev, чтобы не требовало HTTPS
+# )
+#
+# bucket_name = "user-files"
+# user_id = 1
+# file_name = "report.pdf"
+# local_file_path = "/path/to/report.pdf"
+#
+# # Формируем "путь" (префикс). Это просто строка.
+# s3_key = f"user_{user_id}/{file_name}"
+#
+# # Загружаем файл. Папка user_1 создастся неявно.
+# s3_client.upload_file(
+#     Filename=local_file_path,
+#     Bucket=bucket_name,
+#     Key=s3_key,
+#     ExtraArgs={"ContentType": "application/pdf"} # Важно для корректного отображения
+# )
+#
+# print(f"Файл загружен по ключу: {s3_key}")

@@ -11,7 +11,7 @@ from starlette.middleware.cors import CORSMiddleware
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from src.auth.exception import BaseAppException
-from src.auth.providers import AdaptersProvider, InfrastructureProvider, IntegrationsProvider
+from src.auth.providers import AdaptersProvider, InfrastructureProvider
 from src.auth.router import router as user_router
 from src.storage.providers import StorageProvider
 from src.storage.router import router as storage_router
@@ -73,7 +73,6 @@ def create_app(container_dishka=None) -> FastAPI:
             AdaptersProvider(),
             StorageProvider(),
             InfrastructureProvider(),
-            IntegrationsProvider(),
             context={Settings: app_settings} # в контекст дишки отправляем настройки
         )
 

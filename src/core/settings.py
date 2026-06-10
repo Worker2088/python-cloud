@@ -29,6 +29,11 @@ class Settings(BaseSettings):
     jwt_expire_minutes: int # время жизни JWT токена
     redis_url: str = "redis://localhost:6379"
 
+    minio_root_user: str
+    minio_root_password: str
+    minio_endpoint: str
+    minio_bucket_name: str
+
     @computed_field
     @property
     def db_url(self) -> str:

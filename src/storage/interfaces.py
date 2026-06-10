@@ -13,3 +13,6 @@ class IStorageRepository(Protocol):
 
     async def get_folder_by_id(self, folder_id: int) -> Folder | None:
         ...
+
+    async def get_folder_id_by_path(self, user_id: int, path: str) -> int | None:
+        pass

@@ -5,29 +5,27 @@ from pydantic import BaseModel, Field, ConfigDict
 
 class CreateFolderRequest(BaseModel):
     name: str = Field(min_length=1, max_length=100)
-    # user_id: int
-    parent_id: int = None
+    path: str | None = None
+    #    parent_id: int = None
 
     model_config = ConfigDict(from_attributes=True)
 
 
 class CreateFolderResponse(BaseModel):
-    # id: int
+    path: str | None = None
     name: str
-    user_id: int
-    parent_id: int | None = None
-    # Включаем поддержку ORM-моделей
+    type: str
+
     model_config = ConfigDict(from_attributes=True)
 
 
 class DeleteFolderRequest(BaseModel):
     folder_id: int
     user_id: int
-    # current_user_id: int
-    # parent_id: int = None
 
     model_config = ConfigDict(from_attributes=True)
 
+# схема для отображения хранимых файлов/папок
 class ObjectType(str, Enum):
     FILE = "FILE"
     DIRECTORY = "DIRECTORY"

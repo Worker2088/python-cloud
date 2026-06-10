@@ -13,7 +13,7 @@ from src.auth.security import IPasswordHasher, BcryptHasher
 from src.auth.service import UserService
 from src.auth.session.storage import RedisSessionStorage, ISessionStorage
 from src.core.settings import Settings
-
+from src.storage.s3 import S3Client
 
 logger = logging.getLogger(__name__)
 
@@ -116,7 +116,8 @@ class IFileStorage:
 class S3Storage:
     pass
 
-class IntegrationsProvider(Provider):
-    @provide(scope=Scope.REQUEST)
-    def provide_s3_storage(self) -> IFileStorage:
-        return S3Storage(bucket_name="user-avatars")
+# class IntegrationsProvider(Provider):
+    # @provide(scope=Scope.REQUEST)
+    # def provide_s3_storage(self) -> IFileStorage:
+    #     return S3Storage(bucket_name="user-avatars")
+

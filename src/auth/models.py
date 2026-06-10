@@ -22,21 +22,3 @@ class User(Base):
         nullable=False
     )
     is_active: Mapped[bool] = mapped_column(Boolean, default= True, index=True)
-
-    # access_key: Mapped[str] = mapped_column(
-    #         String(length=1024), unique=True,
-    #         nullable=False)
-    # secret_key: Mapped[str] = mapped_column(
-    #         String(length=1024), unique=True,
-    #         nullable=False)
-    # endpoint_url: Mapped[str] = mapped_column(
-    #             String(length=1024),
-    #             nullable=False)
-    # bucket_name: Mapped[str] = mapped_column(
-    #             String(length=1024),
-    #             nullable=False)
-
-    # имя
-    # размер
-    # владелец
-    # путь
