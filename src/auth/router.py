@@ -24,7 +24,6 @@ from fastapi import APIRouter, Response, status, Cookie
 from src.auth.dependencies import CurrentUserDeps
 from src.auth.schemas import (
     UserRegisterRequest,
-    JWTResponse,
     UserLoginRequest,
     UserResponse,
 )

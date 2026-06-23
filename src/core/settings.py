@@ -53,12 +53,15 @@ class Settings(BaseSettings):
     postgres_port: int
     postgres_db: str
 
-    debug: bool = True
+    debug: bool = False
+    # debug: bool = True # для разработки
+
 
     jwt_secret: str
     jwt_expire_minutes: int  # время жизни JWT токена
 
-    redis_url: str = "redis://localhost:6379"
+    redis_url: str = "redis://redis:6379"
+    # redis_url: str = "redis://localhost:6379" для разработки
 
     minio_root_user: str
     minio_root_password: str

@@ -18,7 +18,6 @@ from src.auth.models import User
 from src.auth.schemas import (
     UserRegisterRequest,
     UserLoginRequest,
-    JWTResponse,
     UserResponse,
 )
 from src.auth.security import IPasswordHasher

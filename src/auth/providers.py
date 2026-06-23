@@ -22,13 +22,11 @@ from sqlalchemy.ext.asyncio import (
 
 from src.auth.interfaces import IUserRepository
 from src.auth.jwt import IJWT, JWT
-from src.auth.models import User
 from src.auth.repository import UserRepository
 from src.auth.security import IPasswordHasher, BcryptHasher
 from src.auth.service import UserService
 from src.auth.session.storage import RedisSessionStorage, ISessionStorage
 from src.core.settings import Settings
-from src.storage.s3 import S3Client
 
 logger = logging.getLogger(__name__)
 

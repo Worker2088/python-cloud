@@ -8,7 +8,6 @@ from alembic import context
 
 from src.core.settings import Settings
 from src.db.base import Base
-from src.auth.models import User
 
 # Это объект конфигурации Alembic, который предоставляет
 # доступ к значениям внутри используемого .ini файла.

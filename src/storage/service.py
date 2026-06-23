@@ -223,7 +223,7 @@ class StorageService:
 
             await self.repo.delete_list_objects(from_s3_key)
 
-        except Exception as e:
+        except Exception:
             raise StorageExternalError()
 
         return StorageObjectSchema(

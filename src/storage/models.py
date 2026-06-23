@@ -1,7 +1,4 @@
-from sqlalchemy import String, Boolean, ForeignKey, Integer, UniqueConstraint, Index
-from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from src.db.base import Base
 
 # -----------------------------------
 # вариант с метаданными на постгрэс
