@@ -1,101 +1,3 @@
-//window.APP_CONFIG = {
-//
-//    //ссылка на ваш гитхаб репозиторий с проектом
-//    githubLink: "https://gist.github.com/zhukovsd/1052313b231bb1eebd5b910990ee1050",
-//
-//    //Имя, которое отображается в хедере
-//    mainName: "CLOUD STORAGE",
-//
-//    //адрес вашего бэка. если пустой - значит на одном url с таким же портом.
-//    //если запускаете бэк и фронт через докер compose - тут ставите имя бэка в докер сети
-//    baseUrl: "",
-//
-//    //API префикс вашего бэка
-//    baseApi: "/api",
-//
-//
-//    /*
-//    *
-//    * Конфигурация валидации форм
-//    *
-//    * */
-//
-//    //Если true - форма будет валидироваться,
-//    //ошибки будут отображаться при вводе. Кнопка будет активна только при валидных данных
-//    //Если false - форму можно отправить без валидации.
-//    validateLoginForm: true,
-//    validateRegistrationForm: true,
-//
-//    //корректное имя пользователя
-//    validUsername: {
-//        minLength: 3,
-//        maxLength: 25,
-//        pattern: "^[a-zA-Z0-9]+[a-zA-Z_0-9]*[a-zA-Z0-9]+$",
-//    },
-//
-//    //корректный пароль
-//    validPassword: {
-//        minLength: 8,
-//        maxLength: 20,
-//        pattern: "^[a-zA-Z0-9!@#$%^&*(),.?\":{}|<>[\\]/`~+=-_';]*$",
-//    },
-//
-//    //корректное имя для папки
-//    validFolderName: {
-//        minLength: 1,
-//        maxLength: 200,
-//        pattern: "^[^/\\\\:*?\"<>|]+$",
-//    },
-//
-//
-//    /*
-//    *
-//    * Утилитные конфигурации
-//    *
-//    * */
-//
-//    //Разрешать ли перемещение выделенных файлов и папок с помощью перетаскивания в соседние папки. (drag n drop)
-//    isMoveAllowed: true,
-//
-//    //Разрешить вырезать и вставлять файлы/папки. Для этого используется эндпоинт /move  - если у вас реализован, то всё должно работать
-//    isCutPasteAllowed: true,
-//
-//    //Разрешить кастомное контекстное меню для управления файлами (вызывается правой кнопкой мыши - на одном файле, или на выделенных)
-//    isFileContextMenuAllowed: true,
-//
-//    //Разрешить шорткаты на странице - Ctrl+X, Ctrl+V, Del - на выделенных элементах
-//    isShortcutsAllowed: true,
-//
-//    //набор утилитных функций для взаимодействия с фронтом.
-//    functions: {
-//
-//        //функциия для маппинга формата данных бэка в формат фронта.
-//        mapObjectToFrontFormat: (obj) => {
-//            const isFolder = obj.type === "DIRECTORY";
-//
-//            // ИСПРАВЛЕНО: принудительно добавляем слэш к имени папки, если бэк прислал без него
-//            const processedName = isFolder && !obj.name.endsWith('/') ? obj.name + '/' : obj.name;
-//
-//            // ИСПРАВЛЕНО: принудительно добавляем слэш к пути папки для корректной навигации фронта
-//            let processedPath = obj.path + obj.name;
-//            if (isFolder && !processedPath.endsWith('/')) {
-//                processedPath += '/';
-//            }
-//
-//            return {
-//                lastModified: obj.lastModified || null, // ИСПРАВЛЕНО: не затираем дату изменения в null
-//                name: processedName,
-//                size: obj.size,
-//                path: processedPath,
-//                folder: isFolder
-//            }
-//        },
-//
-//    }
-//
-//};
-
-
 window.APP_CONFIG = {
 
     //ссылка на ваш гитхаб репозиторий с проектом
@@ -106,7 +8,7 @@ window.APP_CONFIG = {
 
     //адрес вашего бэка. если пустой - значит на одном url с таким же портом.
     //если запускаете бэк и фронт через докер compose - тут ставите имя бэка в докер сети
-    baseUrl: "",
+    baseUrl: "http://fastapi:80",
 
     //API префикс вашего бэка
     baseApi: "/api",
@@ -126,7 +28,7 @@ window.APP_CONFIG = {
 
     //корректное имя пользователя
     validUsername: {
-        minLength: 3,
+        minLength: 5,
         maxLength: 25,
         pattern: "^[a-zA-Z0-9]+[a-zA-Z_0-9]*[a-zA-Z0-9]+$",
     },
@@ -179,11 +81,14 @@ window.APP_CONFIG = {
         //В данном мапинге подразумевается, что obj.path c бэка будет приходить со слэшом на конце.
         //Если объект находится в корневой директории - obj.path  - пустая строка. и после форматирования - path будет просто названием объекта
         mapObjectToFrontFormat: (obj) => {
+            // Если obj.path отсутствует или равен null, используем пустую строку
+            const safePath = obj.path || "";
             return {
                 lastModified: null,
                 name: obj.name,
                 size: obj.size,
-                path: obj.path + obj.name, //путь в полном формате необходим для корректной навигации
+                path: safePath + obj.name, // Теперь будет "" + "files" = "files"
+//                path: obj.path + obj.name, //путь в полном формате необходим для корректной навигации
                 folder: obj.type === "DIRECTORY" // фронт использует простой boolean. Если папка имеет другое название - смените
             }
         },
