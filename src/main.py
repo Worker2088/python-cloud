@@ -1,5 +1,16 @@
+"""
+Главный модуль приложения FastAPI.
+
+Отвечает за:
+- инициализацию FastAPI приложения
+- подключение роутеров (auth, storage)
+- настройку DI контейнера (Dishka)
+- настройку CORS
+- загрузку конфигурации логирования
+- обработку глобальных исключений
+"""
+
 import json
-import logging
 import logging.config
 from pathlib import Path
 
@@ -24,60 +35,156 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 config = None
 
 
+# --------------------------------------------
+# загрузка logging конфигурации из JSON файла
+
 try:
     with open(BASE_DIR / "logs" / "logging.json", "r") as file:
         config = json.load(file)
-        print("logging.json успешно прочитан")
-
 
 except (json.JSONDecodeError, FileNotFoundError):
     config = None
-    print("Ошибка загрузки logging.json")
+
 
 if config:
-    # LOGGING = config
+    # применение logging конфигурации
     logging.config.dictConfig(config)
-    print("LOGGING: JSON CONFIG USED")
+
+
+def register_exception_handlers(app: FastAPI) -> None:
+    """Регистрация всех обработчиков ошибок для приложения."""
+
+    @app.exception_handler(BaseAppException)
+    async def base_app_exception_handler(request: Request, exc: BaseAppException):
+        """
+        Обработчик бизнес-исключений приложения.
+
+        Логирует:
+        - тип ошибки
+        - статус код
+        - сообщение
+        - путь запроса
+
+        Возвращает:
+        - JSON error response
+        """
+
+        logger.info(
+            "business_exception",
+            extra={
+                "exception_type": exc.__class__.__name__,
+                "status_code": exc.status_code,
+                "error_message": exc.message,
+                "path": request.url.path,
+            },
+        )
+
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={"message": exc.message},
+        )
+
+    @app.exception_handler(StarletteHTTPException)
+    async def http_exception_handler(request: Request, exc: StarletteHTTPException):
+        """
+        Обработчик HTTP ошибок Starlette.
+
+        Например:
+        - 404 Not Found
+        """
+
+        if exc.status_code == 404:
+            return JSONResponse(
+                status_code=exc.status_code,
+                content={"message": "Ресурс не найден"},
+            )
+
+    @app.exception_handler(Exception)
+    async def global_exception_handler(
+        request: Request,
+        exc: Exception,
+    ):
+        """
+        Ловит все необработанные исключения.
+
+        Используется как safety net (fallback handler).
+
+        Логирует:
+        - stack trace (exc_info=True)
+        - путь запроса
+        - HTTP метод
+
+        Возвращает:
+        - 500 Internal Server Error
+        """
+
+        logger.error(
+            "unexpected_exception",
+            exc_info=True,
+            extra={
+                "path": request.url.path,
+                "method": request.method,
+            },
+        )
+
+        return JSONResponse(
+            status_code=500, content={"message": "Internal server error"}
+        )
 
 
 def create_app(container_dishka=None) -> FastAPI:
+    """
+    Фабрика FastAPI приложения.
+
+    Отвечает за:
+    - регистрацию роутеров
+    - настройку DI контейнера
+    - подключение middleware (CORS, logging)
+    """
+
     app = FastAPI()
-    logger.debug("создал app %s", app)
-    # подключил группу роутов router к приложению app
+    logger.info("создал app %s", app)
+
     app.include_router(user_router)
     app.include_router(storage_router)
-    # app.add_middleware(LoggingMiddleware) # сделал чтоб просто посмотреть работу с middleware
 
-    # Указываем адреса, с которых разрешены запросы к API
+    app.add_middleware(LoggingMiddleware)
+
+    # --------------------------------------------
+    # CORS настройка (frontend → backend доступ)
+
     origins = [
-        "http://localhost:5173",  # Для локальной разработки React (Vite)
-        "http://localhost:80",  # Для продакшена через Nginx
-        "http://localhost",  # На случай запросов без указания порта
+        "http://localhost:5173",
+        "http://localhost:80",
+        "http://localhost",
     ]
 
     app.add_middleware(
         CORSMiddleware,
         allow_origins=origins,
-        allow_credentials=True,  # Важно для работы с куками и сессиями
-        allow_methods=["*"],  # Разрешаем все методы (GET, POST, PUT, DELETE)
-        allow_headers=["*"],  # Разрешаем все заголовки
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
     )
 
+    # --------------------------------------------
+    # DI контейнер (Dishka)
+
     if container_dishka is None:
-        # Читаем настройки НА СТАРТЕ приложения.
-        # Если в .env ошибка — код упадет прямо здесь, жестко и сразу.
         app_settings = Settings()
 
-        # 1. Создаем контейнер и передаем наши провайдеры
         container_dishka = make_async_container(
             AdaptersProvider(),
             StorageProvider(),
             InfrastructureProvider(),
-            context={Settings: app_settings} # в контекст дишки отправляем настройки
+            context={Settings: app_settings},
         )
 
-    # 2. Интегрируем Dishka в FastAPI
     setup_dishka(container_dishka, app)
+
+    # регистрируем обработчики, чтобы при вызове create_app
+    # они автоматом регистрировались и работали напр в тестовом окружении
+    register_exception_handlers(app)
 
     return app
 
@@ -87,28 +194,10 @@ app = create_app()
 
 @app.get("/api/v1/healthcheck")
 def healthcheck():
+    """
+    Проверка работоспособности сервиса.
+
+    Returns:
+        dict: статус сервиса
+    """
     return {"status": "ok"}
-
-
-@app.exception_handler(BaseAppException)
-async def base_app_exception_handler(request: Request, exc: BaseAppException):
-    return JSONResponse(
-        status_code=exc.status_code,
-        content={"message": exc.message},
-    )
-
-# ловим HTTP-исключения (Starlette) и формируем ответ по ТЗ
-@app.exception_handler(StarletteHTTPException)
-async def http_exception_handler(request: Request, exc: StarletteHTTPException):
-    if exc.status_code == 404:
-        # Приводим к формату ТЗ
-        return JSONResponse(
-            status_code=exc.status_code,
-            content={"message": "Ресурс не найден"},  # Или можно взять exc.detail, если хочешь
-        )
-
-    # # Для остальных HTTPException (400, 401, 500 и т. п.) тоже можно унифицировать
-    # return JSONResponse(
-    #     status_code=exc.status_code,
-    #     content={"message": exc.detail},
-    # )

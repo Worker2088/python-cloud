@@ -1,117 +1,136 @@
+"""
+Repository слой для работы с S3/MinIO.
+
+Отвечает за:
+- CRUD объектов в S3
+- копирование/удаление
+- получение metadata
+- низкоуровневое взаимодействие с boto client
+"""
+
 import logging
-
-from fastapi import HTTPException
-from sqlalchemy import select, Result
-from sqlalchemy.exc import IntegrityError
+from botocore.exceptions import ClientError
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
-from src.auth.exception import UserAlreadyExistsError, DatabaseError
-from src.auth.models import User
-from src.storage.exception import FolderAlreadyExistsError, FolderDeleteError
-from src.storage.models import Folder
+from src.storage.exception import (
+    ObjectNotFoundError,
+    StorageExternalError,
+)
+from src.storage.s3 import S3Client
 
 logger = logging.getLogger(__name__)
 
-class StorageRepository():
-    def __init__(self, session: AsyncSession):
+
+class StorageRepository:
+    """
+    Репозиторий для работы с S3 хранилищем.
+    """
+
+    def __init__(self, session: AsyncSession, s3client: S3Client):
         self.session = session
+        self.s3client = s3client
 
-
-    async def create_folder(self, user_id: int, name: str, parent_id: int) -> Folder:
-        folder = Folder(user_id=user_id, name=name, parent_id=parent_id)
-
-        self.session.add(folder)
-
-        # ловим ошибку уникальности - UniqueConstraint('name', 'parent_id', 'user_id', name='uq_folder_unique_name')
-        try:
-            await self.session.commit()
-        except IntegrityError as e:
-            logger.debug("имя папки не уникально, отменяю транзакцию")
-            await self.session.rollback()
-
-            if 'uq_folder_unique_name' in str(e.orig):
-                logger.debug("ОШИБКА, папка с таким именем уже есть, %s", name)
-                raise FolderAlreadyExistsError()
-            else:
-                logger.debug("ОШИБКА в БД, данные не сохранились")
-                raise DatabaseError()
-
-        await self.session.refresh(folder)
-        logger.debug("новая папка создана, %s", folder)
-        return folder
-
-
-    async def get_folder_id_by_path(
-            self,
-            user_id: int,
-            parts: list[str],
-    ) -> int | None:
-        logger.debug("!!!user_id, parts, %s, %s", user_id, parts)
-
-        parent = None
-
-        for name in parts:
-            query = select(Folder).where(
-                Folder.user_id == user_id,
-                Folder.name == name,
-                Folder.parent_id == (parent.id if parent else None)
+    async def put_object(self, key: str, body: bytes = b"") -> str:
+        """Создаёт объект в S3."""
+        async with self.s3client.get_client() as client:
+            await client.put_object(
+                Bucket=self.s3client.bucket_name,
+                Key=key,
+                Body=body,
             )
-            logger.debug("!!!query, %s", query)
+        return key
 
-            result = await self.session.execute(query)
-            logger.debug("!!!result, %s", result)
-            parent = result.scalar_one_or_none()
-            logger.debug("!!!parent, %s", parent.name)
+    async def copy_object(self, from_key: str, to_key: str) -> str:
+        """Копирует объект в S3."""
+        async with self.s3client.get_client() as client:
+            await client.copy_object(
+                Bucket=self.s3client.bucket_name,
+                CopySource={"Bucket": self.s3client.bucket_name, "Key": from_key},
+                Key=to_key,
+            )
+        return to_key
 
-            if parent is None:
-                raise HTTPException(
-                    status_code=404,
-                    detail=f"Folder not found in path: {'/'.join(parts)}"
+    async def delete_object(self, s3_key: str) -> None:
+        """Удаляет объект из S3."""
+        try:
+            async with self.s3client.get_client() as client:
+                await client.delete_object(Bucket=self.s3client.bucket_name, Key=s3_key)
+        except ClientError as e:
+            error_code = e.response.get("Error", {}).get("Code")
+
+            if error_code in ("404", "NoSuchKey", "NoSuchBucket"):
+                raise ObjectNotFoundError()
+
+            raise StorageExternalError()
+
+    async def delete_list_objects(self, s3_key: str) -> None:
+        """Удаляет все объекты по префиксу (папка)."""
+        async with self.s3client.get_client() as client:
+            objects = await self.get_list_objects(s3_key)
+
+            try:
+                await client.delete_objects(
+                    Bucket=self.s3client.bucket_name, Delete={"Objects": objects}
                 )
+            except ClientError:
+                raise StorageExternalError()
 
-        logger.debug("!!!get_folder_id_by_path, parent.id, %s", parent.id)
-        return parent.id
+    async def get_info_objects(self, s3_key: str) -> dict:
+        """Возвращает metadata объекта."""
+        async with self.s3client.get_client() as client:
+            return await client.head_object(
+                Bucket=self.s3client.bucket_name, Key=s3_key
+            )
 
+    async def object_exists(self, key: str) -> bool:
+        """Проверяет существование объекта."""
+        async with self.s3client.get_client() as client:
+            try:
+                await client.head_object(
+                    Bucket=self.s3client.bucket_name,
+                    Key=key,
+                )
+                return True
+            except ClientError:
+                return False
 
-    async def delete_folder(self, folder: Folder) -> None:
-        await self.session.delete(folder)
-        await self.session.commit()
+    async def get_list_objects_with_delimiter(self, key: str) -> dict:
+        """Возвращает файлы и папки первого уровня."""
+        if not key.endswith("/"):
+            key += "/"
 
+        async with self.s3client.get_client() as client:
+            response = await client.list_objects_v2(
+                Bucket=self.s3client.bucket_name, Prefix=key, Delimiter="/"
+            )
 
-    async def get_folder_by_id(self, folder_id: int) -> Folder | None:
-        logger.debug("!!!folder_id, %s", folder_id)
+        return {
+            "files": response.get("Contents", []),
+            "dirs": response.get("CommonPrefixes", []),
+        }
 
-        stmt = select(Folder).options(selectinload(Folder.children)).where(Folder.id == folder_id)
+    async def get_list_objects(self, key: str) -> list[dict]:
+        """Возвращает все объекты по префиксу."""
+        async with self.s3client.get_client() as client:
+            response = await client.list_objects_v2(
+                Bucket=self.s3client.bucket_name, Prefix=key
+            )
 
-        result = await self.session.execute(stmt)
-        logger.debug("!!!result, %s", result)
-        folder = result.scalar_one_or_none()
-        logger.debug("!!!folder, %s", folder.name)
+        return [{"Key": item["Key"]} for item in response.get("Contents", [])]
 
-        return folder
+    async def size_file(self, s3_key: str) -> int:
+        """Возвращает размер файла."""
+        async with self.s3client.get_client() as client:
+            resp = await client.head_object(
+                Bucket=self.s3client.bucket_name, Key=s3_key
+            )
+        return resp["ContentLength"]
 
-    async def get_info_folder_by_id(self, folder_id: int, current_user_id) -> list[Folder] | None:
-        logger.debug("!!!folder_id, %s", folder_id)
-
-        stmt = select(Folder).where(Folder.parent_id == folder_id)
-
-        result = await self.session.execute(stmt)
-        logger.debug("!!!result, %s", result)
-
-        return result.scalars().all()
-
-
-
-
-
-
-
-        # удаление
-        # await self.session.delete(user)
-        # await self.session.commit()
-        # апдейт
-        # user = await self.session.get(User, user_id)
-        # user.username = new_username
-        # await self.session.commit()
-        # await self.session.refresh(user)
+    async def get_object(self, s3_key: str) -> bytes:
+        """Читает содержимое объекта."""
+        async with self.s3client.get_client() as client:
+            resp = await client.get_object(
+                Bucket=self.s3client.bucket_name,
+                Key=s3_key,
+            )
+            return await resp["Body"].read()

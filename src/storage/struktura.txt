@@ -1,3 +1,13 @@
+Создание пустой папки
+POST /directory?path=$path
+
+
+
+
+
+
+
+
 src/storage/
 ├── __init__.py
 ├── router.py          # Эндпоинты для файлов/папок (GET /directory, POST /upload)

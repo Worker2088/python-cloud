@@ -1,3 +1,12 @@
+"""
+Модуль конфигурации приложения.
+
+Назначение:
+- загрузка конфигурации из env
+- хранение настроек БД, JWT, Redis, MinIO
+- формирование вспомогательных computed properties
+"""
+
 import logging
 
 from pydantic import computed_field, BaseModel
@@ -7,11 +16,32 @@ logger = logging.getLogger(__name__)
 
 
 class AuthSettings(BaseModel):
+    """
+    Настройки авторизации.
+
+    Attributes:
+        secret: секретный ключ JWT
+        expire_minutes: время жизни токена
+    """
+
     secret: str
     expire_minutes: int
 
 
 class Settings(BaseSettings):
+    """
+    Основной конфиг приложения.
+
+    Загружается из .env файла.
+
+    Содержит:
+    - настройки PostgreSQL
+    - настройки Redis
+    - JWT конфигурацию
+    - MinIO конфигурацию
+    - режим debug
+    """
+
     model_config = SettingsConfigDict(
         env_file=".env",
         extra="ignore",
@@ -26,7 +56,8 @@ class Settings(BaseSettings):
     debug: bool = True
 
     jwt_secret: str
-    jwt_expire_minutes: int # время жизни JWT токена
+    jwt_expire_minutes: int  # время жизни JWT токена
+
     redis_url: str = "redis://localhost:6379"
 
     minio_root_user: str
@@ -37,6 +68,12 @@ class Settings(BaseSettings):
     @computed_field
     @property
     def db_url(self) -> str:
+        """
+        Формирует async SQLAlchemy database URL.
+
+        Returns:
+            str: строка подключения к PostgreSQL
+        """
         return (
             f"postgresql+asyncpg://"
             f"{self.postgres_user}:"
@@ -46,12 +83,14 @@ class Settings(BaseSettings):
             f"{self.postgres_db}"
         )
 
-
     @property
     def auth(self) -> AuthSettings:
-        return AuthSettings(secret=self.jwt_secret, expire_minutes=self.jwt_expire_minutes)
+        """
+        Возвращает объект настроек авторизации.
 
-
-# settings = Settings()
-# logger.debug("создал settings %s", settings)
-
+        Returns:
+            AuthSettings: JWT конфигурация
+        """
+        return AuthSettings(
+            secret=self.jwt_secret, expire_minutes=self.jwt_expire_minutes
+        )

@@ -1,55 +1,67 @@
 """
-Тесты для сервиса аутентификации.
-Проверяют логику регистрации пользователей.
+Тесты модуля аутентификации.
+
+Проверяют:
+- регистрацию пользователя
+- обработку дублей username
+- интеграцию router → service → DB → DI
 """
 
-import pytest
-from httpx import AsyncClient, ASGITransport
+import logging
 
-from src.auth.service import UserService
+import pytest
+
+from src.core.middleware.logging import logger
+
+
+logger = logging.getLogger(__name__)
 
 
 @pytest.mark.asyncio
 async def test_example():
+    """
+    Базовый smoke test.
+    Проверяет что тестовая инфраструктура работает.
+    """
     assert 1 == 1
+
 
 @pytest.mark.asyncio
 async def test_successful_sign_up(async_client):
     """
-    Проверяем успешную регистрацию.
-    Тест должен пройти весь цикл: роутер -> Dishka -> Сервис -> Хэширование -> БД -> Возврат.
+    Проверка успешной регистрации пользователя.
+
+    Flow теста:
+    router → service → repo → DB → session storage → response
     """
-    user_data = {
-        "username": "test_user_1",
-        "password": "strong_password_123"
-    }
+
+    user_data = {"username": "test_user_1", "password": "strong_password_123"}
 
     response = await async_client.post("/api/auth/sign-up", json=user_data)
 
-    # Ожидаем 200 OK или 201 Created
     assert response.status_code == 200
 
-    # Проверяем, что в ответе вернулся токен (или ID сессии, в зависимости от твоей схемы)
     data = response.json()
+
     assert "session_id" in data
     assert isinstance(data["session_id"], str)
 
 
 async def test_duplicate_username_sign_up(async_client):
     """
-    Проверяем логику исключений: нельзя создать двух юзеров с одинаковым именем.
-    """
-    user_data = {
-        "username": "unique_user",
-        "password": "password"
-    }
+    Проверка защиты от создания дубликатов пользователей.
 
-    # Первый запрос — успешный
+    Ожидаем:
+    - первый запрос успешный
+    - второй возвращает 409 Conflict
+    """
+
+    user_data = {"username": "unique_user", "password": "password"}
+
     await async_client.post("/api/auth/sign-up", json=user_data)
 
-    # Второй запрос с теми же данными
     response = await async_client.post("/api/auth/sign-up", json=user_data)
+    logger.debug("!!!response.status_code, %s", response.status_code)
+    logger.debug("!!!response.json(), %s", response.json())
 
-    # Ожидаем 409 Conflict, как у тебя написано в роутере
     assert response.status_code == 409
-    assert response.json()["detail"] == "User already exists"

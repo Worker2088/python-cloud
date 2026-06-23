@@ -9,7 +9,6 @@ from alembic import context
 from src.core.settings import Settings
 from src.db.base import Base
 from src.auth.models import User
-from src.storage.models import Folder, File
 
 # Это объект конфигурации Alembic, который предоставляет
 # доступ к значениям внутри используемого .ini файла.
@@ -49,10 +48,7 @@ def run_migrations_offline() -> None:
 
 def do_run_migrations(connection):
     """Вспомогательная функция для выполнения миграций внутри синхронного контекста."""
-    context.configure(
-        connection=connection,
-        target_metadata=target_metadata
-    )
+    context.configure(connection=connection, target_metadata=target_metadata)
 
     with context.begin_transaction():
         context.run_migrations()

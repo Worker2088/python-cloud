@@ -1,48 +1,79 @@
+"""
+HTTP слой (FastAPI router).
+
+Отвечает за:
+- auth endpoints
+- user endpoints
+- cookies (session handling)
+
+Endpoints:
+- POST /auth/sign-up
+- POST /auth/sign-in
+- POST /auth/sign-out
+- GET  /user/me
+
+Поддерживает session-based authentication через cookies.
+"""
+
 import logging
-from typing import Optional
 
 from dishka import FromDishka
 from dishka.integrations.fastapi import inject
-from fastapi import APIRouter, Path, HTTPException, Response, Query, status, Cookie
+from fastapi import APIRouter, Response, status, Cookie
 
 from src.auth.dependencies import CurrentUserDeps
-from src.auth.exception import UserAlreadyExistsError, UserNotLoggedInError, UserNotFoundError
-from src.auth.models import User
-from src.auth.schemas import UserRegisterRequest, JWTResponse, UserLoginRequest, SessionResponse, UserResponse
+from src.auth.schemas import (
+    UserRegisterRequest,
+    JWTResponse,
+    UserLoginRequest,
+    UserResponse,
+)
 from src.auth.service import UserService
 from src.auth.session.storage import ISessionStorage
-from src.storage.schemas import StorageObjectSchema
 
-# from src.auth.session.service import SessionService
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api") # создай mini-app для группы роутов
-# router это папка/контейнер с группой endpoint'ов
+router = APIRouter(prefix="/api")
 
 
 # --------------------------------------------
 # реализация через сессии
 
-@router.post("/auth/sign-up", response_model=UserResponse)
-@inject  # <-- ОБЯЗАТЕЛЬНО: этот декоратор заставляет Dishka искать маркеры в аргументах
-async def create_user(
-        create_user_dto: UserRegisterRequest,
-        user_service: FromDishka[UserService],
-        response: Response
-        ):
-    logger.debug("!!!начал регистрацию нового юзера, %s", create_user_dto)
 
+@router.post("/auth/sign-up", response_model=UserResponse)
+@inject
+async def create_user(
+    create_user_dto: UserRegisterRequest,
+    user_service: FromDishka[UserService],
+    response: Response,
+):
+    """
+    Регистрация нового пользователя.
+
+    Flow:
+    1. Получает данные пользователя (username, password)
+    2. Вызывает UserService.create()
+    3. Создаёт пользователя в БД
+    4. Создаёт session_id в Redis
+    5. Возвращает UserResponse
+    6. Устанавливает session_id в cookie (если есть)
+
+    Side effects:
+    - создание пользователя в БД
+    - создание сессии в Redis
+    - установка cookie session_id
+    """
     user_response = await user_service.create(create_user_dto)
 
-    # 3. УСТАНАВЛИВАЕМ КУКУ ДЛЯ БРАУЗЕРА
-    # Достаем session_id из ответа сервиса (проверь, как называется поле в твоем user_response)
+    # проверяем что у ответа сервера есть session_id
+    # и устанавливаем куку
     if hasattr(user_response, "session_id") and user_response.session_id:
         response.set_cookie(
             key="session_id",
             value=str(user_response.session_id),
             httponly=True,  # Защита от кражи токена через JS-скрипты
-            path="/"  # Доступно для всех эндпоинтов /api
+            path="/",  # Доступно для всех эндпоинтов /api
         )
     return user_response
 
@@ -50,20 +81,35 @@ async def create_user(
 @router.post("/auth/sign-in", response_model=UserResponse)
 @inject
 async def authenticate(
-        user: UserLoginRequest,
-        user_service: FromDishka[UserService],
-        response: Response
-        ):
-    logger.debug("!!!начал авторизацию нового юзера, %s", user)
+    user: UserLoginRequest, user_service: FromDishka[UserService], response: Response
+):
+    """
+    Аутентификация пользователя (login).
 
+    Flow:
+    1. Получает username/password
+    2. Проверяет пользователя через UserService.authenticate()
+    3. Проверяет пароль
+    4. Создаёт новую session в Redis
+    5. Возвращает UserResponse
+    6. Устанавливает session_id в cookie
+
+    Raises:
+    - UserNotFoundError (через service layer)
+
+    Side effects:
+    - создание новой сессии
+    - установка cookie session_id
+    """
     user_response = await user_service.authenticate(user)
-    # 3. УСТАНАВЛИВАЕМ КУКУ ДЛЯ БРАУЗЕРА ПРИ ЛОГИНЕ
+
+    # при успешной авторизации устанавливаем куку для браузера
     if hasattr(user_response, "session_id") and user_response.session_id:
         response.set_cookie(
             key="session_id",
             value=str(user_response.session_id),
             httponly=True,
-            path="/"
+            path="/",
         )
     return user_response
 
@@ -71,111 +117,75 @@ async def authenticate(
 @router.get("/user/me")
 @inject
 async def me(current_user: CurrentUserDeps):
+    """
+    Получение текущего авторизованного пользователя.
+
+    Flow:
+    1. Берёт user из dependency (get_current_user)
+    2. Dependency проверяет session_id → Redis → DB
+    3. Возвращает текущего пользователя
+
+    Returns:
+        dict: id и username текущего пользователя
+    """
+
     return {
         "id": current_user.id,
         "username": current_user.username,
     }
 
 
-@router.post("/auth/logout", status_code=status.HTTP_200_OK)
+@router.post("/auth/sign-out", status_code=status.HTTP_204_NO_CONTENT)
 @inject
 async def logout(
-        response: Response,
-        sessions: FromDishka[ISessionStorage],
-        session_id: str | None = Cookie(default=None) # Напрямую смотрим, есть ли кука session_id
+    response: Response,
+    sessions: FromDishka[ISessionStorage],
+    session_id: str | None = Cookie(
+        default=None
+    ),  # Напрямую смотрим, есть ли кука session_id
 ):
-    logger.debug("!!! Начал логаут для сессии: %s", session_id)
+    """
+    Выход пользователя (logout).
 
-    # 1. Если кука прилетела, стираем сессию из Redis
-    if session_id:
-        try:
-            # Вызываем метод удаления из твоего RedisSessionStorage (например, delete_session)
-            await sessions.delete_session(session_id)
-            logger.debug("Сессия %s успешно удалена из Redis", session_id)
-        except Exception as e:
-            # Логируем ошибку, но не прерываем запрос, чтобы кука у пользователя всё равно стёрлась
-            logger.error("Не удалось удалить сессию из Redis: %s", e)
+    Flow:
+    1. Берёт session_id из cookie
+    2. Удаляет session из Redis
+    3. Логирует факт удаления
+    4. Удаляет cookie на стороне клиента
 
-    # 2. Даем команду браузеру немедленно уничтожить куку у себя
+    Side effects:
+    - удаление session из Redis
+    - удаление cookie session_id
+    """
+
+    await sessions.delete_session(session_id)
+    logger.info("Сессия успешно удалена из Redis, %s", session_id)
+
+    # Даем команду браузеру немедленно уничтожить куку у себя
     response.delete_cookie(
         key="session_id",
-        path="/",          # Обязательно тот же path, с которым кука создавалась!
-        httponly=True      # Желательно указывать те же флаги безопасности
+        path="/",  # Обязательно тот же path, с которым кука создавалась!
+        httponly=True,  # Желательно указывать те же флаги безопасности
     )
-
-    return {"detail": "Успешный выход из системы"}
-
-
-# @router.get("/directory", response_model=list[StorageObjectSchema])
-# @inject
-# async def get_directory_contents(current_user: CurrentUserDeps, path: Optional[str] = Query("")):
-#     # Здесь у вас уже есть легитимный current_user!
-#     # Вы можете использовать его id, чтобы отдать файлы конкретного пользователя
-#     user_id = current_user.id
-#     print(f"Пользователь {current_user.username} (ID: {user_id}) запрашивает папку: '{path}'")
-#
-#     # Пока отдаем заглушку, но теперь безопасно
-#     if path == "":
-#         return [
-#             {
-#                 "path": "documents",
-#                 "name": "Личные документы",
-#                 "type": "DIRECTORY",
-#                 "size": None
-#             },
-#             {
-#                 "path": "photos",
-#                 "name": "Фотографии с отпуска",
-#                 "type": "DIRECTORY",
-#                 "size": None
-#             },
-#             {
-#                 "path": "important_note.txt",
-#                 "name": "важная_записка.txt",
-#                 "type": "FILE",
-#                 "size": 4096
-#             },
-#             {
-#                 "path": "avatar.png",
-#                 "name": "avatar.png",
-#                 "type": "FILE",
-#                 "size": 1048576
-#             }
-#         ]
-#
-#         # Если запрашивают конкретную папку (например, кликнули на "documents")
-#     return [
-#         {
-#             "path": f"{path}/resume.pdf",
-#             "name": "Резюме_Разработчика.pdf",
-#             "type": "FILE",
-#             "size": 245000
-#         },
-#         {
-#             "path": f"{path}/todo.txt",
-#             "name": "список_дел.txt",
-#             "type": "FILE",
-#             "size": 512
-#         },
-#         {
-#             "path": f"{path}/папка",
-#             "name": "просто папка",
-#             "type": "DIRECTORY",
-#             "size": None
-#         }
-#     ]
 
 
 # --------------------------------------------
 # реализация через JWT
 
 # @router.post("/sign-up", response_model=JWTResponse)
-# @inject  # <-- ОБЯЗАТЕЛЬНО: этот декоратор заставляет Dishka искать маркеры в аргументах
+# @inject
 # async def create_user(
 #         create_user_dto: UserRegisterRequest,
 #         user_service: FromDishka[UserService]
 #         ):
-#     logger.debug("!!!начал регистрацию нового юзера, %s", create_user_dto)
+#     """
+#     JWT версия регистрации пользователя.
+#
+#     Flow:
+#     1. Создание пользователя
+#     2. Генерация JWT токена
+#     3. Возврат токена клиенту
+#     """
 #
 #     try:
 #         token = await user_service.create(create_user_dto)
@@ -194,7 +204,14 @@ async def logout(
 #         user: UserLoginRequest,
 #         user_service: FromDishka[UserService]
 #         ):
-#     logger.debug("!!!начал авторизацию нового юзера, %s", user)
+#     """
+#     JWT версия логина пользователя.
+#
+#     Flow:
+#     1. Проверка пользователя
+#     2. Генерация JWT токена
+#     3. Возврат токена
+#     """
 #
 #     try:
 #         token = await user_service.authenticate(user)
@@ -210,19 +227,3 @@ async def logout(
 #             status_code=404,
 #             detail="user not found"
 #         )
-#
-#
-# @router.get("/me")
-# @inject
-# # async def me(current_user: FromDishka[User]):
-# async def me(current_user: CurrentUserDeps):
-#     return {
-#         "id": current_user.id,
-#         "username": current_user.username,
-#     }
-
-
-
-
-
-
