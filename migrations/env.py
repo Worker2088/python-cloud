@@ -6,8 +6,8 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from alembic import context
 
-from src.core.settings import Settings
-from src.db.base import Base
+from backend.core.settings import Settings
+from backend.db.base import Base
 
 # Это объект конфигурации Alembic, который предоставляет
 # доступ к значениям внутри используемого .ini файла.

@@ -3,9 +3,9 @@ import "~/.config/just/common.just"
 default:
     @just --list
 
-# запуск сервера "uv run uvicorn src.main:app --reload"
+# запуск сервера "uv run uvicorn backend.main:app --reload"
 run:
-    uv run uvicorn src.main:app --reload
+    uv run uvicorn backend.main:app --reload
 
 # =========================
 # DOCKER

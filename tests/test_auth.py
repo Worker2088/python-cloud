@@ -11,7 +11,7 @@ import logging
 
 import pytest
 
-from src.core.middleware.logging import logger
+from backend.core.middleware.logging import logger
 
 
 logger = logging.getLogger(__name__)
@@ -61,7 +61,7 @@ async def test_duplicate_username_sign_up(async_client):
     await async_client.post("/api/auth/sign-up", json=user_data)
 
     response = await async_client.post("/api/auth/sign-up", json=user_data)
-    logger.debug("!!!response.status_code, %s", response.status_code)
-    logger.debug("!!!response.json(), %s", response.json())
+    # logger.debug("!!!response.status_code, %s", response.status_code)
+    # logger.debug("!!!response.json(), %s", response.json())
 
     assert response.status_code == 409
