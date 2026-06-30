@@ -173,33 +173,3 @@ async def get_current_user(
 CurrentUserDeps = Annotated[User, Depends(get_current_user)]
 
 
-# --------------------------------------------
-# реализация через JWT
-
-# oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/sign-in")
-
-# @inject
-# async def get_current_user(
-#         token: Annotated[str, Depends(oauth2_scheme)],
-#         service: FromDishka[UserService],
-#         jwt: FromDishka[IJWT]
-# ) -> User:
-#     logger.debug("TOKEN RAW: %s", token)
-#     user_id = jwt.decode_access_token(token)
-#     logger.debug("user_id: %s", user_id)
-#
-#     if user_id is None:
-#         raise HTTPException(401, "Invalid token")
-#     logger.debug("!!!jwt.decode_access_token(token), user_id %s", user_id)
-#
-#     user = await service.get_user_by_id(user_id)
-#
-#     if user is None:
-#         raise HTTPException(401, "User not found")
-#     logger.debug("!!!service.get_user_by_id(user_id), username %s", user.username)
-#
-#     user_id_ctx_var.set(str(user_id))
-#
-#     return user
-#
-# CurrentUserDeps = Annotated[User, Depends(get_current_user)]
